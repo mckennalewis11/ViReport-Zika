@@ -1,0 +1,1 @@
+iqtree -m MFP -s /Users/mckennalewis/Desktop/ViReport/firstDir/output_files/sequences_safe.aln -nt AUTO

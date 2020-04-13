@@ -1,0 +1,1 @@
+mafft --reorder --nomemsave --thread -1 --auto /Users/mckennalewis/Desktop/ViReport/firstDir/output_files/sequences_safe.fas
