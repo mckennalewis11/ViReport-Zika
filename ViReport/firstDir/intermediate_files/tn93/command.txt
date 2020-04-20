@@ -1,1 +1,1 @@
-tn93 -t 1 -l 1 -q
+tn93 -t 1 -l 1 -q -o /Users/mckennalewis/Desktop/ViReport/firstDir/output_files/pairwise_distances_sequence.csv

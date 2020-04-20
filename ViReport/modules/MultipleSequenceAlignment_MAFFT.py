@@ -26,18 +26,14 @@ class MultipleSequenceAlignment_MAFFT(MultipleSequenceAlignment):
             raise ValueError("Invalid sequence file: %s" % seqs_filename)
         mafft_dir = '%s/MAFFT' % GC.OUT_DIR_TMPFILES
         out_filename = '%s/%s.aln' % (GC.OUT_DIR_OUTFILES, '.'.join(GC.rstrip_gz(seqs_filename.split('/')[-1]).split('.')[:-1]))
-        if GC.GZIP_OUTPUT:
-            out_filename += '.gz'
         if isfile(out_filename) or isfile('%s.gz' % out_filename):
             GC.SELECTED['Logging'].writeln("Multiple sequence alignment exists. Skipping recomputation.")
         else:
             makedirs(mafft_dir, exist_ok=True)
             f_stderr = open('%s/log.txt' % mafft_dir, 'w')
-            command = ['mafft', '--reorder', '--nomemsave', '--thread']
-            if GC.NUM_THREADS is None:
-                command.append('-1')
-            else:
-                command.append(str(GC.NUM_THREADS))
+            command = ['mafft', '--reorder', '--nomemsave']
+            if GC.NUM_THREADS is not None:
+                command += ['--thread', str(GC.NUM_THREADS)]
             if seqs_filename.lower().endswith('.gz'):
                 unzipped_filename = '%s/seqs_unzipped.fas' % mafft_dir
                 GC.write_file('\n'.join(GC.read_file(seqs_filename)), unzipped_filename)

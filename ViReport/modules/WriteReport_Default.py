@@ -8,6 +8,7 @@ from matplotlib.patches import Patch
 from numpy import mean,quantile,std
 from os import makedirs
 from seaborn import color_palette
+from subprocess import call
 from treeswift import read_tree_newick
 ZERO_THRESHOLD = 0.0000001
 
@@ -28,9 +29,10 @@ class WriteReport_Default(WriteReport):
         close = GC.SELECTED['ReportFormat'].close
         figure = GC.SELECTED['ReportFormat'].figure
         bullets = GC.SELECTED['ReportFormat'].bullets
-
-        # Input Dataset
-        id_to_cat = {l.split('\t')[0].strip() : l.split('\t')[1].strip() for l in GC.read_file(GC.INPUT_CATEGORIES)}
+        GC.OUT_DIR_REPORTFILES = "%s/report_files" % GC.OUT_DIR
+        makedirs(GC.OUT_DIR_REPORTFILES, exist_ok=True)
+        GC.OUT_DIR_REPORTFIGS = '%s/figs' % GC.OUT_DIR_REPORTFILES
+        makedirs(GC.OUT_DIR_REPORTFIGS, exist_ok=True)
 
         ## make input sequence lengths figure
         seq_lengths = GC.seq_lengths_fasta(GC.INPUT_SEQS)
@@ -39,9 +41,10 @@ class WriteReport_Default(WriteReport):
 
         ## make input sample times figure
         dates_vireport = {u:GC.days_to_date(GC.date_to_days(v)) for u,v in GC.load_dates_ViReport(GC.INPUT_TIMES)}
-        for l in GC.read_file(GC.INPUT_OUTGROUPS):
-            if l.strip() in dates_vireport:
-                del dates_vireport[l.strip()]
+        if GC.INPUT_OUTGROUPS is not None:
+            for l in GC.read_file(GC.INPUT_OUTGROUPS):
+                if l.strip() in dates_vireport:
+                    del dates_vireport[l.strip()]
         dates = sorted(dates_vireport[l[1:].strip()] for l in GC.read_file(GC.INPUT_SEQS) if l.startswith('>') and l[1:].strip() in dates_vireport)
         if len(dates) % 2 == 0:
             med_date = GC.days_to_date((GC.date_to_days(dates[int(len(dates)/2)]) + GC.date_to_days(dates[int(len(dates)/2)-1])) / 2)
@@ -52,9 +55,11 @@ class WriteReport_Default(WriteReport):
         GC.create_barplot(dates, dates_hist_filename, all_labels=all_dates, rotate_labels=90, title="Input Sample Dates", xlabel="Sample Date", ylabel="Count")
 
         ## make input categories figure
-        sample_cats = sorted(id_to_cat[l[1:].strip()] for l in GC.read_file(GC.INPUT_SEQS) if l.startswith('>') and l[1:].strip() in id_to_cat)
-        cats_hist_filename = '%s/input_categories.pdf' % GC.OUT_DIR_REPORTFIGS
-        GC.create_barplot(sample_cats, cats_hist_filename, horizontal=True, title="Input Sample Categories", ylabel="Category", xlabel="Count")
+        if GC.INPUT_CATEGORIES is not None:
+            id_to_cat = {l.split('\t')[0].strip() : l.split('\t')[1].strip() for l in GC.read_file(GC.INPUT_CATEGORIES)}
+            sample_cats = sorted(id_to_cat[l[1:].strip()] for l in GC.read_file(GC.INPUT_SEQS) if l.startswith('>') and l[1:].strip() in id_to_cat)
+            cats_hist_filename = '%s/input_categories.pdf' % GC.OUT_DIR_REPORTFIGS
+            GC.create_barplot(sample_cats, cats_hist_filename, horizontal=True, title="Input Sample Categories", ylabel="Category", xlabel="Count")
 
         ## write section
         section("Input Dataset")
@@ -66,10 +71,8 @@ class WriteReport_Default(WriteReport):
         write(" and the most recent sample date was %s." % dates[-1])
         figure(seq_lengths_hist_filename, width=0.75, caption="Distribution of input sequence lengths")
         figure(dates_hist_filename, width=0.75, caption="Distribution of input sample dates")
-        figure(cats_hist_filename, width=0.75, caption="Distribution of input sample categories")
-
-        # Preprocessing
-        proc_id_to_cat = {l.split('\t')[0].strip() : l.split('\t')[1].strip() for l in GC.read_file(GC.PROCESSED_CATEGORIES)}
+        if GC.INPUT_CATEGORIES is not None:
+            figure(cats_hist_filename, width=0.75, caption="Distribution of input sample categories")
 
         ## make processed sequence lengths figure
         proc_seq_lengths = GC.seq_lengths_fasta(GC.PROCESSED_SEQS)
@@ -78,9 +81,10 @@ class WriteReport_Default(WriteReport):
 
         ## make processed sample times figure
         proc_dates_vireport = {u:GC.days_to_date(GC.date_to_days(v)) for u,v in GC.load_dates_ViReport(GC.PROCESSED_TIMES)}
-        for l in GC.read_file(GC.PROCESSED_OUTGROUPS):
-            if l.strip() in proc_dates_vireport:
-                del proc_dates_vireport[l.strip()]
+        if GC.PROCESSED_OUTGROUPS is not None:
+            for l in GC.read_file(GC.PROCESSED_OUTGROUPS):
+                if l.strip() in proc_dates_vireport:
+                    del proc_dates_vireport[l.strip()]
         proc_dates = sorted(proc_dates_vireport[l[1:].strip()] for l in GC.read_file(GC.PROCESSED_SEQS) if l.startswith('>') and l[1:].strip() in proc_dates_vireport)
         if len(proc_dates) % 2 == 0:
             med_proc_date = GC.days_to_date((GC.date_to_days(proc_dates[int(len(proc_dates)/2)]) + GC.date_to_days(proc_dates[int(len(proc_dates)/2)-1])) / 2)
@@ -91,9 +95,13 @@ class WriteReport_Default(WriteReport):
         GC.create_barplot(proc_dates, proc_dates_hist_filename, all_labels=all_proc_dates, rotate_labels=90, title="Processed Sample Dates", xlabel="Sample Date", ylabel="Count")
 
         ## make processed categories figure
-        proc_sample_cats = sorted(id_to_cat[l[1:].strip()] for l in GC.read_file(GC.INPUT_SEQS) if l.startswith('>') and l[1:].strip() in id_to_cat)
-        proc_cats_hist_filename = '%s/processed_input_categories.pdf' % GC.OUT_DIR_REPORTFIGS
-        GC.create_barplot(proc_sample_cats, proc_cats_hist_filename, horizontal=True, title="Processed Sample Categories", ylabel="Category", xlabel="Count")
+        if GC.PROCESSED_CATEGORIES is None:
+            proc_id_to_cat = dict()
+        else:
+            proc_id_to_cat = {l.split('\t')[0].strip() : l.split('\t')[1].strip() for l in GC.read_file(GC.PROCESSED_CATEGORIES)}
+            proc_sample_cats = sorted(proc_id_to_cat[l[1:].strip()] for l in GC.read_file(GC.PROCESSED_SEQS) if l.startswith('>') and l[1:].strip() in proc_id_to_cat)
+            proc_cats_hist_filename = '%s/processed_input_categories.pdf' % GC.OUT_DIR_REPORTFIGS
+            GC.create_barplot(proc_sample_cats, proc_cats_hist_filename, horizontal=True, title="Processed Sample Categories", ylabel="Category", xlabel="Count")
 
         ## write section
         section("Preprocessed Dataset")
@@ -106,7 +114,8 @@ class WriteReport_Default(WriteReport):
         write(" and the most recent sample date was %s." % proc_dates[-1])
         figure(proc_seq_lengths_hist_filename, width=0.75, caption="Distribution of preprocessed sequence lengths")
         figure(proc_dates_hist_filename, width=0.75, caption="Distribution of preprocessed sample dates")
-        figure(proc_cats_hist_filename, width=0.75, caption="Distribution of preprocessed sample categories")
+        if GC.PROCESSED_CATEGORIES is not None:
+            figure(proc_cats_hist_filename, width=0.75, caption="Distribution of preprocessed sample categories")
 
         # Multiple Sequence Alignment
         ## compute values of MSA
@@ -116,22 +125,24 @@ class WriteReport_Default(WriteReport):
         msa_num_unique = len(set(msa.values()))
 
         ## make pairwise distances figure
-        dists_seq = [float(l.split(',')[2]) for l in GC.read_file(GC.PAIRWISE_DISTS_SEQS) if not l.startswith('ID1')]
-        dists_seq_hist_filename = '%s/pairwise_distances_sequences.pdf' % GC.OUT_DIR_REPORTFIGS
-        GC.create_histogram(dists_seq, dists_seq_hist_filename, hist=False, kde=True, title="Pairwise Sequence Distances", xlabel="Pairwise Distance", ylabel="Kernel Density Estimate")
+        if GC.PAIRWISE_DISTS_SEQS is not None:
+            dists_seq = [float(l.split(',')[2]) for l in GC.read_file(GC.PAIRWISE_DISTS_SEQS) if not l.startswith('ID1')]
+            dists_seq_hist_filename = '%s/pairwise_distances_sequences.pdf' % GC.OUT_DIR_REPORTFIGS
+            GC.create_histogram(dists_seq, dists_seq_hist_filename, hist=False, kde=True, title="Pairwise Sequence Distances", xlabel="Pairwise Distance", ylabel="Kernel Density Estimate")
 
         ## make Manhattan plot of Shannon entropy
         msa_position_entropies = GC.msa_shannon_entropy(msa)
         msa_position_entropies_filename = '%s/%s.entropies.txt' % (GC.OUT_DIR_OUTFILES, '.'.join(GC.ALIGNMENT.split('/')[-1].split('.')[:-1]))
-        if GC.GZIP_OUTPUT:
-            msa_position_entropies_filename += '.gz'
-        out_lines = list()
+        out = open(msa_position_entropies_filename, 'w')
         for v in msa_position_entropies:
             if abs(v) < ZERO_THRESHOLD:
-                out_lines.append('0')
+                out.write('0\n')
             else:
-                out_lines.append(str(v))
-        GC.write_file('\n'.join(out_lines), msa_position_entropies_filename)
+                out.write(str(v)); out.write('\n')
+        out.close()
+        if GC.GZIP_OUTPUT:
+            call(GC.PIGZ_COMMAND + [msa_position_entropies_filename])
+            msa_position_entropies_filename += '.gz'
         msa_position_entropies_q1 = quantile(msa_position_entropies, 0.25)
         msa_position_entropies_q3 = quantile(msa_position_entropies, 0.75)
         msa_entropy_manhattan_ythresh = msa_position_entropies_q3 + 1.5*(msa_position_entropies_q3-msa_position_entropies_q1)
@@ -146,15 +157,16 @@ class WriteReport_Default(WriteReport):
         ## make Manhattan plot of coverage
         msa_position_coverage = GC.msa_coverage(msa)
         msa_position_coverage_filename = '%s/%s.coverage.txt' % (GC.OUT_DIR_OUTFILES, '.'.join(GC.ALIGNMENT.split('/')[-1].split('.')[:-1]))
-        if GC.GZIP_OUTPUT:
-            msa_position_coverage_filename += '.gz'
-        out_lines = list()
+        out = open(msa_position_coverage_filename, 'w')
         for v in msa_position_coverage:
             if abs(v) < ZERO_THRESHOLD:
-                out_lines.append('0')
+                out.write('0\n')
             else:
-                out_lines.append(str(v))
-        GC.write_file('\n'.join(out_lines), msa_position_coverage_filename)
+                out.write(str(v)); out.write('\n')
+        out.close()
+        if GC.GZIP_OUTPUT:
+            call(GC.PIGZ_COMMAND + [msa_position_coverage_filename])
+            msa_position_coverage_filename += '.gz'
         msa_coverage_manhattan_filename = '%s/alignment_coverage.pdf' % GC.OUT_DIR_REPORTFIGS
         GC.create_manhattan(msa_position_coverage, msa_coverage_manhattan_filename, dot_size=8, title="Alignment Position Coverage", xlabel="Position of Multiple Sequence Alignment", ylabel="Proportion Non-Gap")
 
@@ -162,10 +174,11 @@ class WriteReport_Default(WriteReport):
         section("Multiple Sequence Alignment")
         write(GC.SELECTED['MultipleSequenceAlignment'].blurb())
         write(" There were %d positions (%d invariant) and %d unique sequences in the multiple sequence alignment. " % (msa_columns, msa_num_invariant, msa_num_unique))
-        write(GC.SELECTED['PairwiseDistancesSequence'].blurb())
-        write(" The average pairwise sequence distance was %s," % GC.num_str(mean(dists_seq)))
-        write(" with a standard deviation of %s." % GC.num_str(std(dists_seq)))
-        figure(dists_seq_hist_filename, width=0.75, caption="Distribution of pairwise sequence distances")
+        if GC.PAIRWISE_DISTS_SEQS is not None:
+            write(GC.SELECTED['PairwiseDistancesSequence'].blurb())
+            write(" The average pairwise sequence distance was %s," % GC.num_str(mean(dists_seq)))
+            write(" with a standard deviation of %s." % GC.num_str(std(dists_seq)))
+            figure(dists_seq_hist_filename, width=0.75, caption="Distribution of pairwise sequence distances")
         write("Across the positions of the multiple sequence alignment,")
         write(" the minimum coverage was %s," % GC.num_str(min(v for v in msa_position_coverage)))
         write(" the maximum coverage was %s," % GC.num_str(max(v for v in msa_position_coverage)))
@@ -197,21 +210,29 @@ class WriteReport_Default(WriteReport):
                 node.color = pal_mut[proc_id_to_cat[node.label]]
         GC.color_internal(tree_mut)
         tree_mut_viz_filename = '%s/tree_mutations.pdf' % GC.OUT_DIR_REPORTFIGS
-        tree_mut.draw(show_labels=True, handles=handles_mut, show_plot=False, export_filename=tree_mut_viz_filename, xlabel="Expected Number of Per-Site Mutations")
-        dists_tree = [float(l.split(',')[2]) for l in GC.read_file(GC.PAIRWISE_DISTS_TREE) if not l.startswith('ID1')]
-        dists_tree_hist_filename = '%s/pairwise_distances_tree.pdf' % GC.OUT_DIR_REPORTFIGS
-        GC.create_histogram(dists_tree, dists_tree_hist_filename, hist=False, kde=True, title="Pairwise Phylogenetic Distances", xlabel="Pairwise Distance", ylabel="Kernel Density Estimate")
+        try:
+            tree_mut.draw(show_labels=True, handles=handles_mut, show_plot=False, export_filename=tree_mut_viz_filename, xlabel="Expected Number of Per-Site Mutations")
+        except:
+            tree_mut_viz_filename = None
+        if GC.PAIRWISE_DISTS_TREE is not None:
+            dists_tree = [float(l.split(',')[2]) for l in GC.read_file(GC.PAIRWISE_DISTS_TREE) if not l.startswith('ID1')]
+            dists_tree_hist_filename = '%s/pairwise_distances_tree.pdf' % GC.OUT_DIR_REPORTFIGS
+            GC.create_histogram(dists_tree, dists_tree_hist_filename, hist=False, kde=True, title="Pairwise Phylogenetic Distances", xlabel="Pairwise Distance", ylabel="Kernel Density Estimate")
 
         ## write section
         section("Phylogenetic Inference")
         write(GC.SELECTED['PhylogeneticInference'].blurb())
         write(' '); write(GC.SELECTED['Rooting'].blurb())
-        write(' '); write(GC.SELECTED['PairwiseDistancesTree'].blurb())
-        write(" The maximum pairwise phylogenetic distance (i.e., tree diameter) was %s," % GC.num_str(max(dists_tree)))
-        write(" and the average pairwise phylogenetic distance was %s," % GC.num_str(mean(dists_tree)))
-        write(" with a standard deviation of %s." % GC.num_str(std(dists_tree)))
-        figure(tree_mut_viz_filename, width=1, height=1, caption="Rooted phylogenetic tree in unit of expected per-site mutations")
-        figure(dists_tree_hist_filename, width=0.75, caption="Distribution of pairwise phylogenetic distances")
+        if tree_mut_viz_filename is None:
+            write(" The tree was too large to draw.")
+        else:
+            figure(tree_mut_viz_filename, width=1, height=1, caption="Rooted phylogenetic tree in unit of expected per-site mutations")
+        if GC.PAIRWISE_DISTS_TREE is not None:
+            write(GC.SELECTED['PairwiseDistancesTree'].blurb())
+            write(" The maximum pairwise phylogenetic distance (i.e., tree diameter) was %s," % GC.num_str(max(dists_tree)))
+            write(" and the average pairwise phylogenetic distance was %s," % GC.num_str(mean(dists_tree)))
+            write(" with a standard deviation of %s." % GC.num_str(std(dists_tree)))
+            figure(dists_tree_hist_filename, width=0.75, caption="Distribution of pairwise phylogenetic distances")
 
         # Phylogenetic Dating
         ## compute values of dated phylogeny
@@ -237,7 +258,10 @@ class WriteReport_Default(WriteReport):
         tree_time_viz_filename = '%s/tree_time.pdf' % GC.OUT_DIR_REPORTFIGS
         tmrca_year = int(tmrca_date.split('-')[0])
         tmrca_year_percent = tmrca_year + (tmrca_days - GC.date_to_days("%d-01-01" % tmrca_year))/365.
-        tree_time.draw(show_labels=True, handles=handles_time, show_plot=False, export_filename=tree_time_viz_filename, xlabel="Year", start_time=tmrca_year_percent)
+        try:
+            tree_time.draw(show_labels=True, handles=handles_time, show_plot=False, export_filename=tree_time_viz_filename, xlabel="Year", start_time=tmrca_year_percent)
+        except:
+            tree_time_viz_filename = None
 
         ## write section
         section("Phylogenetic Dating")
@@ -245,28 +269,33 @@ class WriteReport_Default(WriteReport):
         write(" The height of the dated tree was %s days," % GC.num_str(tree_time_height))
         write(" so given that the most recent sample was collected on %s," % proc_dates[-1])
         write(" the estimated time of the most recent common ancestor (tMRCA) was %s." % tmrca_date)
-        figure(tree_time_viz_filename, width=1, height=1, caption="Dated phylogenetic tree in unit of years")
+        if tree_time_viz_filename is None:
+            write(" The tree was too large to draw.")
+        else:
+            figure(tree_time_viz_filename, width=1, height=1, caption="Dated phylogenetic tree in unit of years")
 
         # Ancestral Sequence Reconstruction
-        section("Ancestral Sequence Reconstruction")
-        write(GC.SELECTED['AncestralSequenceReconstruction'].blurb())
+        if GC.ANCESTRAL_SEQS is not None:
+            section("Ancestral Sequence Reconstruction")
+            write(GC.SELECTED['AncestralSequenceReconstruction'].blurb())
 
         # Transmission Clustering
-        ## compute values of transmission clustering
-        clusters,singletons = GC.read_transmission_clusters(GC.TRANSMISSION_CLUSTERS)
-        cluster_sizes = [len(clusters[k]) for k in clusters]
-        cluster_sizes_hist_filename = '%s/cluster_sizes.pdf' % GC.OUT_DIR_REPORTFIGS
-        GC.create_histogram(cluster_sizes, cluster_sizes_hist_filename, hist=True, kde=False, title="Cluster Sizes", xlabel="Cluster Size", ylabel="Count")
+        if GC.TRANSMISSION_CLUSTERS is not None:
+            ## compute values of transmission clustering
+            clusters,singletons = GC.read_transmission_clusters(GC.TRANSMISSION_CLUSTERS)
+            cluster_sizes = [len(clusters[k]) for k in clusters]
+            cluster_sizes_hist_filename = '%s/cluster_sizes.pdf' % GC.OUT_DIR_REPORTFIGS
+            GC.create_histogram(cluster_sizes, cluster_sizes_hist_filename, hist=True, kde=False, title="Cluster Sizes", xlabel="Cluster Size", ylabel="Count")
 
-        ## write section
-        section("Transmission Clustering")
-        write(GC.SELECTED['TransmissionClustering'].blurb())
-        write(" The total number of singletons (i.e., non-clustered individuals) was %d," % len(singletons))
-        write(" and the total number of clusters (excluding singletons) was %d." % len(clusters))
-        write(" The average cluster size (excluding singletons) was %s," % GC.num_str(mean(cluster_sizes)))
-        write(" with a standard deviation of %s," % GC.num_str(std(cluster_sizes)))
-        write(" and the maximum and minimum cluster sizes were %d and %d, respectively." % (max(cluster_sizes), min(cluster_sizes)))
-        figure(cluster_sizes_hist_filename, width=0.75, caption="Distribution of cluster sizes (excluding singletons)")
+            ## write section
+            section("Transmission Clustering")
+            write(GC.SELECTED['TransmissionClustering'].blurb())
+            write(" The total number of singletons (i.e., non-clustered individuals) was %d," % len(singletons))
+            write(" and the total number of clusters (excluding singletons) was %d." % len(clusters))
+            write(" The average cluster size (excluding singletons) was %s," % GC.num_str(mean(cluster_sizes)))
+            write(" with a standard deviation of %s," % GC.num_str(std(cluster_sizes)))
+            write(" and the maximum and minimum cluster sizes were %d and %d, respectively." % (max(cluster_sizes), min(cluster_sizes)))
+            figure(cluster_sizes_hist_filename, width=0.75, caption="Distribution of cluster sizes (excluding singletons)")
 
         # Citations
         section("Citations")

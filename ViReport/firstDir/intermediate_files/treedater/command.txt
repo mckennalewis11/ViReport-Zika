@@ -1,1 +1,1 @@
-tdcl -t /Users/mckennalewis/Desktop/ViReport/firstDir/output_files/rooted.tre -s /Users/mckennalewis/Desktop/ViReport/firstDir/intermediate_files/treedater/times_treedater.txt -l 11585 -o /Users/mckennalewis/Desktop/ViReport/firstDir/intermediate_files/treedater/dated.tre
+Rscript /Users/mckennalewis/Desktop/ViReport/firstDir/intermediate_files/treedater/run_treedater.R
